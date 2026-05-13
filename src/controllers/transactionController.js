@@ -3,7 +3,14 @@ import User from '../models/User.js';
 
 export async function listTransactions(req, res) {
   const { page = 1, limit = 50, category, type } = req.query;
-  const filter = { $or: [{ senderId: req.user._id }, { receiverId: req.user._id }] };
+  const userId = req.user._id.toString();
+
+  const filter = {
+    $or: [
+      { senderId: req.user._id, type: 'debit' },
+      { receiverId: req.user._id, type: 'credit', senderId: { $ne: req.user._id } },
+    ],
+  };
   if (category) filter.category = category;
   if (type)     filter.type     = type;
 
@@ -24,12 +31,11 @@ export async function listTransactions(req, res) {
   const enriched = transactions.map(tx => {
     const sender   = userMap[tx.senderId?.toString()];
     const receiver = userMap[tx.receiverId?.toString()];
-    const isMe     = String(req.user._id);
 
     let counterparty = null;
-    if (tx.type === 'debit' && receiver && String(tx.receiverId) !== isMe) {
+    if (tx.type === 'debit' && receiver && tx.receiverId?.toString() !== userId) {
       counterparty = { fullName: receiver.fullName, username: receiver.username };
-    } else if (tx.type === 'credit' && sender && String(tx.senderId) !== isMe) {
+    } else if (tx.type === 'credit' && sender && tx.senderId?.toString() !== userId) {
       counterparty = { fullName: sender.fullName, username: sender.username };
     }
 
